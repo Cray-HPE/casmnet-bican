@@ -107,12 +107,14 @@ def parse_sls_file():
     input_json = pull_sls_networks()
     sls_variables = {
         "CAN": None,
+        "CMN": None,
         "HMN": None,
         "MTL": None,
         "NMN": None,
         "HMN_MTN": None,
         "NMN_MTN": None,
         "CAN_IP_GATEWAY": None,
+        "CMN_IP_GATEWAY": None,
         "HSN_IP_GATEWAY": None,
         "HMN_IP_GATEWAY": None,
         "MTL_IP_GATEWAY": None,
@@ -122,6 +124,8 @@ def parse_sls_file():
         "ncn_w003": None,
         "CAN_IP_PRIMARY": None,
         "CAN_IP_SECONDARY": None,
+        "CMN_IP_PRIMARY": None,
+        "CMN_IP_SECONDARY": None,
         "HMN_IPs": defaultdict(),
         "MTL_IPs": defaultdict(),
         "NMN_IPs": defaultdict(),
@@ -144,6 +148,19 @@ def parse_sls_file():
                             sls_variables["CAN_IP_PRIMARY"] = ip["IPAddress"]
                         elif ip["Name"] == "can-switch-2":
                             sls_variables["CAN_IP_SECONDARY"] = ip["IPAddress"]
+
+        if name == "CMN":
+            sls_variables["CMN"] = sls_network.get("ExtraProperties", {}).get(
+                "CIDR", ""
+            )
+            for subnets in sls_network.get("ExtraProperties", {}).get("Subnets", {}):
+                if subnets["Name"] == "bootstrap_dhcp":
+                    sls_variables["CMN_IP_GATEWAY"] = subnets["Gateway"]
+                    for ip in subnets["IPReservations"]:
+                        if ip["Name"] == "cmn-switch-1":
+                            sls_variables["CMN_IP_PRIMARY"] = ip["IPAddress"]
+                        elif ip["Name"] == "cmn-switch-2":
+                            sls_variables["CMN_IP_SECONDARY"] = ip["IPAddress"]
 
         elif name == "HMN":
             sls_variables["HMN"] = sls_network.get("ExtraProperties", {}).get(
@@ -216,3 +233,26 @@ def parse_sls_file():
     networks_list = set(tuple(x) for x in networks_list)
 
     return sls_variables
+
+
+def get_ip(hostname):
+    sls_cache = pull_sls_networks()
+    for network in sls_cache:
+        if 'ExtraProperties' not in network or \
+           'Subnets' not in network['ExtraProperties'] or \
+           not network['ExtraProperties']['Subnets']:
+               continue
+        subnets = network['ExtraProperties']['Subnets']
+        for subnet in subnets:
+            if 'IPReservations' not in subnet:
+                continue
+            reservations = subnet['IPReservations']
+            for reservation in reservations:
+                ipv4 = reservation['IPAddress']
+                name = reservation['Name']
+                aliases_string = ''
+                if 'Aliases' in reservation:
+                    aliases = reservation['Aliases']
+                    for alias in aliases:
+                        if hostname == alias:
+                            return(ipv4)
