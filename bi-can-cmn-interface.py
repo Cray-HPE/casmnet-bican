@@ -25,10 +25,10 @@ VLAN='yes'
 
 #get hostname of NCN
 hostname = (platform.node())
-print(hostname)
+print(f"hostname: {hostname}")
 #Call to SLS and get CMN IP address
 ip = sls.get_ip(f"{hostname}-cmn")
-print(f"CMN IP from SLS {ip}")
+print(f"CMN IP from SLS: {ip}")
 
 #apply IP address to J2 template
 cmn_ifcfg = cmn_ifcfg.render(ip = ip)
