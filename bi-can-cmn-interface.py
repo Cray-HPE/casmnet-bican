@@ -16,11 +16,13 @@ ndb = NDB()
 cmn_ifcfg = Template('''VLAN_PROTOCOL='ieee802-1Q'
 ETHERDEVICE='bond0'
 IPADDR={{ ip }}
+PREFIXLEN='24'
 BOOTPROTO='static'
 STARTMODE='auto'
 MTU='1500'
 ONBOOT='yes'
 VLAN='yes'
+VLAN_ID=13
 ''')
 
 #get hostname of NCN
@@ -76,7 +78,7 @@ def write_ifcfg_file(filename):
 #create cmn interface, VLAN, IP, and link set to up.
 def create_interface():
     (ndb.interfaces.create(ifname='cmn', kind='vlan',link='bond0',vlan_id=13).commit())
-    (ndb.interfaces['cmn'].add_ip(ip).commit())
+    (ndb.interfaces['cmn'].add_ip("10.100.0.8/24").commit())
     (ndb.interfaces['cmn'].set('state', 'up').commit())
 
 #ping test with source interface.

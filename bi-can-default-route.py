@@ -124,6 +124,6 @@ for interface in my_interfaces:
     file = (f'{ifcfg_path}ifroute-{interface}')
     write_ifroute_file(desired_default_route, file)
 
-# find home for this github?
+
 #goss test for pre-flight checks for next hop and connectivity
 #run
