@@ -5,8 +5,6 @@ import re
 
 ndb = NDB()
 
-ip_address = re.compile(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})')
-
 def get_interface_status(name):
     #get IP
     ip = list(ndb.interfaces[name].ipaddr.summary().select('address'))
