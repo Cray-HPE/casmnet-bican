@@ -107,10 +107,15 @@ def parse_sls_file():
     input_json = pull_sls_networks()
     sls_variables = {
         "CAN": None,
+        "CAN_VLAN": None,
         "CMN": None,
+        "CMN_VLAN": None,
         "HMN": None,
+        "HMN_VLAN": None,
         "MTL": None,
+        "MTL_VLAN": None,
         "NMN": None,
+        "NMN_VLAN": None,
         "HMN_MTN": None,
         "NMN_MTN": None,
         "CAN_IP_GATEWAY": None,
@@ -141,6 +146,7 @@ def parse_sls_file():
                 "CIDR", ""
             )
             for subnets in sls_network.get("ExtraProperties", {}).get("Subnets", {}):
+                sls_variables["CAN_VLAN"] = subnets.get("VlanID", "")
                 if subnets["Name"] == "bootstrap_dhcp":
                     sls_variables["CAN_IP_GATEWAY"] = subnets["Gateway"]
                     for ip in subnets["IPReservations"]:
@@ -154,6 +160,7 @@ def parse_sls_file():
                 "CIDR", ""
             )
             for subnets in sls_network.get("ExtraProperties", {}).get("Subnets", {}):
+                sls_variables["CMN_VLAN"] = subnets.get("VlanID", "")
                 if subnets["Name"] == "bootstrap_dhcp":
                     sls_variables["CMN_IP_GATEWAY"] = subnets["Gateway"]
                     for ip in subnets["IPReservations"]:
@@ -167,6 +174,7 @@ def parse_sls_file():
                 "CIDR", ""
             )
             for subnets in sls_network.get("ExtraProperties", {}).get("Subnets", {}):
+                sls_variables["HMN_VLAN"] = subnets.get("VlanID", "")
                 if subnets["Name"] == "network_hardware":
                     sls_variables["HMN_IP_GATEWAY"] = subnets["Gateway"]
                     for ip in subnets["IPReservations"]:
@@ -185,6 +193,7 @@ def parse_sls_file():
                 "CIDR", ""
             )
             for subnets in sls_network.get("ExtraProperties", {}).get("Subnets", {}):
+                sls_variables["MTL_VLAN"] = subnets.get("VlanID", "")
                 if subnets["Name"] == "network_hardware":
                     sls_variables["MTL_IP_GATEWAY"] = subnets["Gateway"]
                     for ip in subnets["IPReservations"]:
@@ -195,6 +204,7 @@ def parse_sls_file():
                 "CIDR", ""
             )
             for subnets in sls_network.get("ExtraProperties", {}).get("Subnets", {}):
+                sls_variables["NMN_VLAN"] = subnets.get("VlanID", "")
                 if subnets["Name"] == "bootstrap_dhcp":
                     for ip in subnets["IPReservations"]:
                         if ip["Name"] == "ncn-w001":
@@ -231,7 +241,6 @@ def parse_sls_file():
             networks_list.append([name, vlan])
 
     networks_list = set(tuple(x) for x in networks_list)
-
     return sls_variables
 
 

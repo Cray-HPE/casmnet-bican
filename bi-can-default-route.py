@@ -5,8 +5,9 @@ from pyroute2 import IPRoute
 from pyroute2 import NDB
 from socket import AF_INET
 import ipaddress
-import sls
 import sys
+import utils.sls
+import utils.network
 
 usage_message = "Usage ./bi-can.py [CAN, CHN]"
 # take in switch IP and path as arguments
@@ -23,7 +24,7 @@ except IndexError:
 ndb = NDB()
 
 #retreive all the SLS network variables.
-sls_variables = sls.parse_sls_file()
+sls_variables = utils.sls.parse_sls_file()
 
 HSN_Gateway = (sls_variables['HSN_IP_GATEWAY'])
 CAN_Gateway = (sls_variables['CAN_IP_GATEWAY'])
@@ -49,20 +50,6 @@ def get_interface(name):
         if name in interface.ifname:
             interfaces.append(interface.ifname)
     return interfaces
-        
-# Check interface status
-def get_interface_status(name):
-    for interface in name:
-        #get IP
-        ip = list(ndb.interfaces[interface].ipaddr.summary().select('address'))
-        state = str(ndb.interfaces[interface]['state'])
-        carrier = bool(ndb.interfaces[interface]['carrier'])
-        if carrier == True:
-            carrier_status = "up"
-        else: 
-            carrier_status = "down"
-    #print HSN interface status
-    return (f"INTERFACE: {interface} STATE: {state} CARRIER: {carrier_status} IP: {ip[0]}")
 
 #create default route ifcfg file
 def create_ifroute_file(filename, contents):
@@ -115,7 +102,9 @@ def switch_default_gateway(gateway):
 
 my_interfaces = get_interface(default_route_interface)
 print("INTERFACE STATUS")
-print(get_interface_status(my_interfaces))
+for interface in my_interfaces:
+    print(utils.network.get_interface_status(interface))
+
 print()
 switch_default_gateway(desired_default_route)
 ifcfg_path = '/etc/sysconfig/network/'

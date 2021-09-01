@@ -6,9 +6,11 @@ from pyroute2 import NDB
 from socket import AF_INET
 import ipaddress
 import platform
-import sls
+import utils.sls
+import utils.network
 import sys
 from jinja2 import Template
+from netaddr import *
 
 #ndb debug
 ndb = NDB()
@@ -16,48 +18,30 @@ ndb = NDB()
 cmn_ifcfg = Template('''VLAN_PROTOCOL='ieee802-1Q'
 ETHERDEVICE='bond0'
 IPADDR={{ ip }}
-PREFIXLEN='24'
+PREFIXLEN={{ prefixlength }}
 BOOTPROTO='static'
 STARTMODE='auto'
 MTU='1500'
 ONBOOT='yes'
 VLAN='yes'
-VLAN_ID=13
+VLAN_ID={{ VLAN }}
 ''')
 
 #get hostname of NCN
 hostname = (platform.node())
 print(f"hostname: {hostname}")
 #Call to SLS and get CMN IP address
-ip = sls.get_ip(f"{hostname}-cmn")
+sls_variables = utils.sls.parse_sls_file()
+VLAN = (sls_variables["CMN_VLAN"])
+CMN_Gateway = (sls_variables["CMN_IP_GATEWAY"])
+CMN_Network = IPNetwork(sls_variables["CMN"])
+
+prefixlength = str(CMN_Network.prefixlen)
+ip = utils.sls.get_ip(f"{hostname}-cmn")
 print(f"CMN IP from SLS: {ip}")
 
 #apply IP address to J2 template
-cmn_ifcfg = cmn_ifcfg.render(ip = ip)
-
-#Call to SLS to get CMN gateway info
-sls_variables = sls.parse_sls_file()
-CMN_Gateway = (sls_variables["CMN_IP_GATEWAY"])
-
-#check for interface existance
-def interface_exists(name):
-    for interface in ndb.interfaces.dump():
-        if name == interface.ifname:
-            return True
-
-#check for interface status, returns interface status
-def get_interface_status(interface):
-    ip = list(ndb.interfaces[interface].ipaddr.summary().select('address'))
-    ip_list = []
-    for i in ip:
-        ip_list.append(i)
-    state = str(ndb.interfaces[interface]['state'])
-    carrier = bool(ndb.interfaces[interface]['carrier'])
-    if carrier == True:
-        carrier_status = "up"
-    else: 
-        carrier_status = "down"
-    return (f"INTERFACE: {interface} STATE: {state} CARRIER: {carrier_status} IP: {ip_list}")
+cmn_ifcfg = cmn_ifcfg.render(ip = ip, prefixlength = prefixlength, VLAN = VLAN)
 
 #create ifcfg file
 def create_ifcfg_file(filename, contents):
@@ -77,8 +61,8 @@ def write_ifcfg_file(filename):
 
 #create cmn interface, VLAN, IP, and link set to up.
 def create_interface():
-    (ndb.interfaces.create(ifname='cmn', kind='vlan',link='bond0',vlan_id=13).commit())
-    (ndb.interfaces['cmn'].add_ip("10.100.0.8/24").commit())
+    (ndb.interfaces.create(ifname='cmn', kind='vlan',link='bond0',vlan_id=VLAN).commit())
+    (ndb.interfaces['cmn'].add_ip(ip).commit())
     (ndb.interfaces['cmn'].set('state', 'up').commit())
 
 #ping test with source interface.
@@ -95,9 +79,9 @@ ifcfg_path = '/etc/sysconfig/network/ifcfg-cmn'
 #create ifcfg file
 write_ifcfg_file(ifcfg_path)
 
-if interface_exists("cmn") == True:
+if utils.network.interface_exists("cmn") == True:
     print("CMN interface already configured")
-    print(get_interface_status("cmn"))
+    print(utils.network.get_interface_status("cmn"))
     if ping("cmn", CMN_Gateway) == True:
         print(f"Ping test to {CMN_Gateway} from the CMM interface is successful")
     else:
@@ -105,7 +89,7 @@ if interface_exists("cmn") == True:
 else:
     print("Missing CMM interface, configuring now.")
     create_interface()
-    print(get_interface_status("cmn"))
+    print(utils.network.get_interface_status("cmn"))
     if ping("cmn", CMN_Gateway) == True:
         print(f"Ping test to {CMN_Gateway} from the CMM interface is successful")
     else:
