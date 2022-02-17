@@ -1,3 +1,24 @@
+# Copyright 2022 Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
+# (MIT License)
 from collections import defaultdict
 import requests
 import urllib3
@@ -18,7 +39,7 @@ def pull_sls_networks():
     # Convenience wrapper around remote calls
     #
     def remote_request(
-        remote_type, remote_url, headers=None, data=None, verify=True, debug=False
+        remote_type, remote_url, headers=None, data=None, verify=False, debug=False
     ):
         remote_response = None
         while True:
@@ -96,7 +117,7 @@ def pull_sls_networks():
 
 def parse_sls_file():
     """Parse the `sls_input_file.json` file or the JSON from SLS `/networks` API for config variables.
-    
+
     Args:
         input_json: JSON from the SLS `/networks` API
 
@@ -106,6 +127,7 @@ def parse_sls_file():
     networks_list = []
     input_json = pull_sls_networks()
     sls_variables = {
+        "BICAN": None,
         "CAN": None,
         "CAN_VLAN": None,
         "CMN": None,
@@ -120,6 +142,7 @@ def parse_sls_file():
         "NMN_MTN": None,
         "CAN_IP_GATEWAY": None,
         "CMN_IP_GATEWAY": None,
+        "CHN_IP_GATEWAY": None,
         "HSN_IP_GATEWAY": None,
         "HMN_IP_GATEWAY": None,
         "MTL_IP_GATEWAY": None,
@@ -129,6 +152,8 @@ def parse_sls_file():
         "ncn_w003": None,
         "CAN_IP_PRIMARY": None,
         "CAN_IP_SECONDARY": None,
+        "CHN_IP_PRIMARY": None,
+        "CHN_IP_SECONDARY": None,
         "CMN_IP_PRIMARY": None,
         "CMN_IP_SECONDARY": None,
         "HMN_IPs": defaultdict(),
@@ -140,6 +165,11 @@ def parse_sls_file():
 
     for sls_network in input_json:
         name = sls_network.get("Name", "")
+
+        if name == "BICAN":
+            sls_variables["BICAN"] = sls_network.get("ExtraProperties", {}).get(
+                "SystemDefaultRoute", ""
+            )
 
         if name == "CAN":
             sls_variables["CAN"] = sls_network.get("ExtraProperties", {}).get(
@@ -168,6 +198,19 @@ def parse_sls_file():
                             sls_variables["CMN_IP_PRIMARY"] = ip["IPAddress"]
                         elif ip["Name"] == "cmn-switch-2":
                             sls_variables["CMN_IP_SECONDARY"] = ip["IPAddress"]
+        elif name == "CHN":
+            sls_variables["CHN"] = sls_network.get("ExtraProperties", {}).get(
+                "CIDR", ""
+            )
+            for subnets in sls_network.get("ExtraProperties", {}).get("Subnets", {}):
+                sls_variables["CHN_VLAN"] = subnets.get("VlanID", "")
+                if subnets["Name"] == "bootstrap_dhcp":
+                    sls_variables["CHN_IP_GATEWAY"] = subnets["Gateway"]
+                    for ip in subnets["IPReservations"]:
+                        if ip["Name"] == "chn-switch-1":
+                            sls_variables["CHN_IP_PRIMARY"] = ip["IPAddress"]
+                        elif ip["Name"] == "chn-switch-2":
+                            sls_variables["CHN_IP_SECONDARY"] = ip["IPAddress"]
 
         elif name == "HMN":
             sls_variables["HMN"] = sls_network.get("ExtraProperties", {}).get(
@@ -179,7 +222,7 @@ def parse_sls_file():
                     sls_variables["HMN_IP_GATEWAY"] = subnets["Gateway"]
                     for ip in subnets["IPReservations"]:
                         sls_variables["HMN_IPs"][ip["Name"]] = ip["IPAddress"]
-        
+
         elif name == "HSN":
             sls_variables["HSN"] = sls_network.get("ExtraProperties", {}).get(
                 "CIDR", ""

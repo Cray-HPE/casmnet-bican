@@ -1,4 +1,25 @@
 #!/usr/bin/env python3
+# Copyright 2022 Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
+# (MIT License)
 import pprint
 import os
 from pyroute2 import IPRoute
@@ -9,35 +30,33 @@ import sys
 import utils.sls
 import utils.network
 
-usage_message = "Usage ./bi-can.py [CAN, CHN]"
+usage_message = "Usage ./bi-can-default-route.py [CHN, CMN]"
 # take in switch IP and path as arguments
 try:
     desired_default_route = sys.argv[1].upper()
-    if desired_default_route not in ["CAN", "CHN"]:
+    if desired_default_route not in ["CHN", "CMN"]:
         print(usage_message)
         raise (SystemExit)
 except IndexError:
     print(usage_message)
     raise (SystemExit)
 
-#ndb debug
+desired_default_route_lc = desired_default_route.lower()
+
 ndb = NDB()
 
 #retreive all the SLS network variables.
 sls_variables = utils.sls.parse_sls_file()
 
-HSN_Gateway = (sls_variables['HSN_IP_GATEWAY'])
-CAN_Gateway = (sls_variables['CAN_IP_GATEWAY'])
+Gateway = (sls_variables["%s_IP_GATEWAY" % desired_default_route])
+sls_default_route = Gateway
 
-if desired_default_route == 'CAN':
-    default_route_interface = 'vlan007'
-    desired_default_route = CAN_Gateway
+if desired_default_route == 'CMN':
+    default_route_interface = desired_default_route_lc
 elif desired_default_route == 'CHN':
-    desired_default_route = HSN_Gateway
     default_route_interface = 'hsn'
 
-print("HSN Default Gateway " + HSN_Gateway)
-print("CAN Default Gateway " + CAN_Gateway)
+print(f"{desired_default_route} Default Gateway {Gateway}")
 
 # Get current default route
 current_default_route = ndb.routes["default"]['gateway']
@@ -70,9 +89,9 @@ def ping(host):
     else:
         return False
 
-def write_ifroute_file(gateway, filename):
-    ifroute_default = (f'default {gateway} - -')
-    #check if file exists    
+def write_ifroute_file(gateway, filename, interface):
+    ifroute_default = (f'default {gateway} - {interface}\n')
+    #check if file exists
     if os.path.isfile(filename):
         #check contents of file
         f = open(filename, 'r')
@@ -95,24 +114,22 @@ def switch_default_gateway(gateway):
     elif ping(gateway) == True:
         print(f"ping test to {gateway} passed")
         print(f"changing the default route to {gateway}")
-        (ndb.routes['default'].remove().create(dst='default', gateway=gateway).commit())
+        (ndb.routes['default'].remove().commit())
+        (ndb.routes.create(dst='default', gateway=gateway).commit())
     else:
         print(f"connection to {gateway} failed")
         raise (SystemExit)
 
 my_interfaces = get_interface(default_route_interface)
 print("INTERFACE STATUS")
+print(my_interfaces)
 for interface in my_interfaces:
     print(utils.network.get_interface_status(interface))
 
 print()
-switch_default_gateway(desired_default_route)
+switch_default_gateway(sls_default_route)
 ifcfg_path = '/etc/sysconfig/network/'
 
 for interface in my_interfaces:
     file = (f'{ifcfg_path}ifroute-{interface}')
-    write_ifroute_file(desired_default_route, file)
-
-
-#goss test for pre-flight checks for next hop and connectivity
-#run
+    write_ifroute_file(sls_default_route, file, interface)

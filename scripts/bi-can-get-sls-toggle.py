@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Copyright 2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -19,3 +20,19 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # (MIT License)
+import pprint
+import os
+from pyroute2 import IPRoute
+from pyroute2 import NDB
+from socket import AF_INET
+import ipaddress
+import sys
+import utils.sls
+import utils.network
+
+ndb = NDB()
+
+sls_variables = utils.sls.parse_sls_file()
+
+SLS_Default_Route = (sls_variables['BICAN'])
+print(SLS_Default_Route)
